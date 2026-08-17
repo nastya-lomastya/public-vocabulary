@@ -708,6 +708,13 @@ export default function VocabTrainer() {
         .vt-btn-ghost:hover:not(:disabled) { background: rgba(46,156,107,0.08); }
 
         .vt-msg { font-size: 13px; color: var(--turquoise); margin-top: 10px; font-weight: 600; }
+        .vt-quota-note {
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 11.5px;
+          color: var(--ink-soft);
+          text-align: center;
+          margin-top: 12px;
+        }
 
         .vt-chip {
           display: inline-flex;
@@ -914,11 +921,6 @@ export default function VocabTrainer() {
         <span className="vt-title">{LANGUAGE.appTitle}</span>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
           <span className="vt-count">{words.length} words</span>
-          {quotaRemaining !== null && (
-            <span className="vt-count" title="AI translations left on your account">
-              {quotaRemaining}/{API_CALL_LIMIT} requests left
-            </span>
-          )}
           <button className="vt-logout-btn" onClick={handleLogout} title="Log out">
             <LogOut size={15} />
           </button>
@@ -1001,6 +1003,11 @@ export default function VocabTrainer() {
             <Plus size={15} /> Save word
           </button>
           {addMsg && <div className="vt-msg">{addMsg}</div>}
+          {quotaRemaining !== null && (
+            <div className="vt-quota-note" title="AI translations left on your account">
+              {quotaRemaining}/{API_CALL_LIMIT} requests left
+            </div>
+          )}
         </div>
       )}
 
