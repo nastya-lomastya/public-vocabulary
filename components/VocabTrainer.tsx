@@ -19,6 +19,7 @@ import {
   LogOut,
 } from "lucide-react";
 import { LANGUAGE, NATIVE } from "@/lib/language";
+import { QUOTA_EXCEEDED_MESSAGE, API_CALL_LIMIT } from "@/lib/quota";
 
 type Word = {
   id: string;
@@ -124,6 +125,15 @@ async function apiAddStreakSeconds(day: string, deltaSeconds: number) {
   if (res.status === 401) redirectToLogin();
 }
 
+async function apiGetUsage(): Promise<{ used: number; limit: number; remaining: number }> {
+  const res = await fetch("/api/usage");
+  if (res.status === 401) {
+    redirectToLogin();
+    return { used: 0, limit: 0, remaining: 0 };
+  }
+  return res.json();
+}
+
 function localDayKey(d: Date = new Date()): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -133,7 +143,7 @@ function localDayKey(d: Date = new Date()): string {
 
 const STREAK_GOAL_SECONDS = 600;
 
-async function callClaude(prompt: string, maxTokens?: number): Promise<string> {
+async function callClaude(prompt: string, maxTokens?: number, onQuota?: (remaining: number) => void): Promise<string> {
   const res = await fetch("/api/claude", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -144,11 +154,17 @@ async function callClaude(prompt: string, maxTokens?: number): Promise<string> {
     throw new Error("session expired");
   }
   const json = await res.json();
+  if (json.remaining !== undefined) onQuota?.(json.remaining);
   if (!res.ok) throw new Error(json.error || "claude call failed");
   return json.text as string;
 }
 
-async function callClaudeVision(prompt: string, mediaType: string, data: string): Promise<string> {
+async function callClaudeVision(
+  prompt: string,
+  mediaType: string,
+  data: string,
+  onQuota?: (remaining: number) => void
+): Promise<string> {
   const res = await fetch("/api/claude", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -159,6 +175,7 @@ async function callClaudeVision(prompt: string, mediaType: string, data: string)
     throw new Error("session expired");
   }
   const json = await res.json();
+  if (json.remaining !== undefined) onQuota?.(json.remaining);
   if (!res.ok) throw new Error(json.error || "claude call failed");
   return json.text as string;
 }
@@ -197,6 +214,9 @@ export default function VocabTrainer() {
   // Streak state
   const [streakDays, setStreakDays] = useState<Record<string, number>>({});
 
+  // AI-call quota state
+  const [quotaRemaining, setQuotaRemaining] = useState<number | null>(null);
+
   // ---- load from server on mount ----
   useEffect(() => {
     (async () => {
@@ -218,6 +238,14 @@ export default function VocabTrainer() {
         // best-effort
       }
     })();
+    (async () => {
+      try {
+        const usage = await apiGetUsage();
+        setQuotaRemaining(usage.remaining);
+      } catch (e) {
+        // best-effort
+      }
+    })();
   }, []);
 
 
@@ -230,12 +258,12 @@ export default function VocabTrainer() {
         addDirection === "tr-ru"
           ? `Слово или короткая фраза на ${LANGUAGE.adjN} языке: "${newTr.trim()}". Дай: 1) перевод на ${NATIVE.adjM} язык одним словом или короткой формулировкой (если это глагол — инфинитив); 2) приближённую фонетическую транскрипцию ЭТОГО ${LANGUAGE.adjN} слова ${NATIVE.transcriptionInstruction}. Ответь СТРОГО в виде JSON-объекта {"translation":"...","transcription":"..."}, без markdown-разметки и пояснений.`
           : `Переведи ${NATIVE.adjN} слово или короткую фразу "${newTr.trim()}" на ${LANGUAGE.adjM} язык одним словом или короткой формулировкой (если это глагол — начальная форма/инфинитив). Также дай приближённую фонетическую транскрипцию получившегося ${LANGUAGE.adjN} слова ${NATIVE.transcriptionInstruction}. Ответь СТРОГО в виде JSON-объекта {"translation":"...","transcription":"..."}, без markdown-разметки и пояснений.`;
-      const raw = await callClaude(prompt);
+      const raw = await callClaude(prompt, undefined, setQuotaRemaining);
       const parsed = JSON.parse(stripFence(raw));
       setNewRu(parsed.translation || "");
       setNewTranscription(parsed.transcription || "");
     } catch (e) {
-      setAddMsg("Couldn't find a translation, enter it manually.");
+      setAddMsg(e instanceof Error && e.message === QUOTA_EXCEEDED_MESSAGE ? e.message : "Couldn't find a translation, enter it manually.");
     }
     setLookupLoading(false);
   }
@@ -330,7 +358,7 @@ export default function VocabTrainer() {
       const prompt = `Переведи список ${LANGUAGE.genitive} слов на ${NATIVE.adjM} язык, и для каждого слова дай приближённую фонетическую транскрипцию ${NATIVE.transcriptionInstruction}. Слова: ${JSON.stringify(
         toAdd
       )}. Ответь СТРОГО в виде JSON-объекта вида {"слово":{"ru":"перевод","transcription":"транскрипция"}} без markdown-разметки, без пояснений, только сам JSON.`;
-      const raw = await callClaude(prompt);
+      const raw = await callClaude(prompt, undefined, setQuotaRemaining);
       const map = JSON.parse(stripFence(raw));
       const newWords: Word[] = toAdd.map((w) => ({
         id: uid(),
@@ -347,7 +375,7 @@ export default function VocabTrainer() {
       setPastedText("");
       setTextMsg(`Added ${newWords.length} words`);
     } catch (e) {
-      setTextMsg("Couldn't translate automatically, try again.");
+      setTextMsg(e instanceof Error && e.message === QUOTA_EXCEEDED_MESSAGE ? e.message : "Couldn't translate automatically, try again.");
     }
     setBatchLoading(false);
   }
@@ -377,7 +405,8 @@ export default function VocabTrainer() {
       const text = await callClaudeVision(
         `Найди на этой фотографии ${LANGUAGE.adjM} текст и выпиши отдельные ${LANGUAGE.genitive} слова из него (в начальной форме где возможно, в нижнем регистре, без повторов, без чисел). Ответь СТРОГО в виде JSON-массива строк, без markdown-разметки и пояснений, например: ["mot","livre"]`,
         mediaType,
-        base64
+        base64,
+        setQuotaRemaining
       );
       const arr = JSON.parse(stripFence(text));
       setExtracted((prev) => {
@@ -394,7 +423,7 @@ export default function VocabTrainer() {
       });
       setTextMsg(`Words found in photo: ${arr.length}`);
     } catch (e) {
-      setTextMsg("Couldn't recognize words in the photo, try another one.");
+      setTextMsg(e instanceof Error && e.message === QUOTA_EXCEEDED_MESSAGE ? e.message : "Couldn't recognize words in the photo, try another one.");
     }
     setImageLoading(false);
   }
@@ -885,6 +914,11 @@ export default function VocabTrainer() {
         <span className="vt-title">{LANGUAGE.appTitle}</span>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
           <span className="vt-count">{words.length} words</span>
+          {quotaRemaining !== null && (
+            <span className="vt-count" title="AI translations left on your account">
+              {quotaRemaining}/{API_CALL_LIMIT} requests left
+            </span>
+          )}
           <button className="vt-logout-btn" onClick={handleLogout} title="Log out">
             <LogOut size={15} />
           </button>

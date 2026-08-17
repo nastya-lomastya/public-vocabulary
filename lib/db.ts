@@ -20,9 +20,10 @@ export function ensureUsersTable() {
         password_hash TEXT NOT NULL,
         password_salt TEXT NOT NULL,
         password_iterations INT NOT NULL,
-        created_at BIGINT NOT NULL
+        created_at BIGINT NOT NULL,
+        api_calls_used INT NOT NULL DEFAULT 0
       )
-    `;
+    `.then(() => sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS api_calls_used INT NOT NULL DEFAULT 0`);
   }
   return usersTableReady;
 }

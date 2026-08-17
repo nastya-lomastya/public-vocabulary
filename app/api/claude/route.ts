@@ -1,8 +1,21 @@
 import { NextResponse } from "next/server";
+import { sql, ensureUsersTable } from "@/lib/db";
+import { getCurrentUserId } from "@/lib/auth";
+import { API_CALL_LIMIT, QUOTA_EXCEEDED_MESSAGE } from "@/lib/quota";
 
 export async function POST(req: Request) {
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: "ANTHROPIC_API_KEY is not set on the server" }, { status: 500 });
+  }
+
+  const userId = await getCurrentUserId();
+  if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  await ensureUsersTable();
+  const [user] = await sql`SELECT api_calls_used FROM users WHERE id = ${userId}`;
+  const used = (user?.api_calls_used as number) ?? 0;
+  if (used >= API_CALL_LIMIT) {
+    return NextResponse.json({ error: QUOTA_EXCEEDED_MESSAGE, remaining: 0 }, { status: 402 });
   }
 
   const body = await req.json();
@@ -48,7 +61,12 @@ export async function POST(req: Request) {
       .join("")
       .trim();
 
-    return NextResponse.json({ text });
+    const [updated] = await sql`
+      UPDATE users SET api_calls_used = api_calls_used + 1 WHERE id = ${userId} RETURNING api_calls_used
+    `;
+    const remaining = Math.max(0, API_CALL_LIMIT - (updated?.api_calls_used as number));
+
+    return NextResponse.json({ text, remaining });
   } catch (e) {
     return NextResponse.json({ error: "Claude API request failed" }, { status: 502 });
   }
