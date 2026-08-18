@@ -814,8 +814,8 @@ export default function VocabTrainer() {
         }
         .vt-streak-summary b { color: var(--ink); font-size: 15px; }
         .vt-streak-flame {
-          width: 22px;
-          height: 22px;
+          width: 28px;
+          height: 28px;
           border-radius: 50%;
           object-fit: cover;
           flex-shrink: 0;
