@@ -254,10 +254,11 @@ export default function VocabTrainer() {
     if (!newTr.trim()) return;
     setLookupLoading(true);
     try {
+      const meaningInstruction = `Если у слова есть несколько (не больше двух) заметно разных по смыслу распространённых значений — укажи оба через запятую, от самого частого к менее частому. Если значение по сути одно — дай только его, не выдумывай второе искусственно.`;
       const prompt =
         addDirection === "tr-ru"
-          ? `Слово или короткая фраза на ${LANGUAGE.adjN} языке: "${newTr.trim()}". Дай: 1) перевод на ${NATIVE.adjM} язык одним словом или короткой формулировкой (если это глагол — инфинитив); 2) приближённую фонетическую транскрипцию ЭТОГО ${LANGUAGE.adjN} слова ${NATIVE.transcriptionInstruction}. Ответь СТРОГО в виде JSON-объекта {"translation":"...","transcription":"..."}, без markdown-разметки и пояснений.`
-          : `Переведи ${NATIVE.adjN} слово или короткую фразу "${newTr.trim()}" на ${LANGUAGE.adjM} язык одним словом или короткой формулировкой (если это глагол — начальная форма/инфинитив). Также дай приближённую фонетическую транскрипцию получившегося ${LANGUAGE.adjN} слова ${NATIVE.transcriptionInstruction}. Ответь СТРОГО в виде JSON-объекта {"translation":"...","transcription":"..."}, без markdown-разметки и пояснений.`;
+          ? `Слово или короткая фраза на ${LANGUAGE.adjN} языке: "${newTr.trim()}". Дай: 1) перевод на ${NATIVE.adjM} язык коротко (если это глагол — инфинитив). ${meaningInstruction} 2) приближённую фонетическую транскрипцию ЭТОГО ${LANGUAGE.adjN} слова ${NATIVE.transcriptionInstruction}. Ответь СТРОГО в виде JSON-объекта {"translation":"...","transcription":"..."}, без markdown-разметки и пояснений.`
+          : `Переведи ${NATIVE.adjN} слово или короткую фразу "${newTr.trim()}" на ${LANGUAGE.adjM} язык коротко (если это глагол — начальная форма/инфинитив). ${meaningInstruction} Также дай приближённую фонетическую транскрипцию получившегося ${LANGUAGE.adjN} слова ${NATIVE.transcriptionInstruction}. Ответь СТРОГО в виде JSON-объекта {"translation":"...","transcription":"..."}, без markdown-разметки и пояснений.`;
       const raw = await callClaude(prompt, undefined, setQuotaRemaining);
       const parsed = JSON.parse(stripFence(raw));
       setNewRu(parsed.translation || "");
@@ -355,7 +356,7 @@ export default function VocabTrainer() {
     }
     setBatchLoading(true);
     try {
-      const prompt = `Переведи список ${LANGUAGE.genitive} слов на ${NATIVE.adjM} язык, и для каждого слова дай приближённую фонетическую транскрипцию ${NATIVE.transcriptionInstruction}. Слова: ${JSON.stringify(
+      const prompt = `Переведи список ${LANGUAGE.genitive} слов на ${NATIVE.adjM} язык, и для каждого слова дай приближённую фонетическую транскрипцию ${NATIVE.transcriptionInstruction}. Если у слова есть несколько (не больше двух) заметно разных по смыслу распространённых значений — укажи оба через запятую, от самого частого к менее частому; если значение по сути одно — дай только его, не выдумывай второе искусственно. Слова: ${JSON.stringify(
         toAdd
       )}. Ответь СТРОГО в виде JSON-объекта вида {"слово":{"ru":"перевод","transcription":"транскрипция"}} без markdown-разметки, без пояснений, только сам JSON.`;
       const raw = await callClaude(prompt, undefined, setQuotaRemaining);
