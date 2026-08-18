@@ -813,7 +813,13 @@ export default function VocabTrainer() {
           margin-bottom: 8px;
         }
         .vt-streak-summary b { color: var(--ink); font-size: 15px; }
-        .vt-streak-flame { font-size: 18px; line-height: 1; }
+        .vt-streak-flame {
+          width: 22px;
+          height: 22px;
+          border-radius: 50%;
+          object-fit: cover;
+          flex-shrink: 0;
+        }
         .vt-streak-today {
           margin-left: auto;
           font-family: 'JetBrains Mono', monospace;
@@ -1085,7 +1091,11 @@ export default function VocabTrainer() {
         <div>
           <div className="vt-streak-bar">
             <div className="vt-streak-summary">
-              <span className="vt-streak-flame">{streakCount > 0 ? "🔥" : "🕯️"}</span>
+              <img
+                className="vt-streak-flame"
+                src={streakCount > 0 ? "/bulka-happy.png" : "/bulka-strict.png"}
+                alt=""
+              />
               <span>
                 <b>{streakCount}</b> day{streakCount === 1 ? "" : "s"} streak
               </span>
