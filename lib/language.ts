@@ -35,7 +35,7 @@ const fr: LanguageConfig = {
 
 const LANGUAGES: Record<LanguageCode, LanguageConfig> = { tr, fr };
 
-const code = (process.env.NEXT_PUBLIC_APP_LANGUAGE as LanguageCode) || "tr";
+const code = (process.env.NEXT_PUBLIC_APP_LANGUAGE?.toLowerCase() as LanguageCode) || "tr";
 
 export const LANGUAGE: LanguageConfig = LANGUAGES[code] || tr;
 
@@ -80,6 +80,6 @@ const en: NativeConfig = {
 
 const NATIVES: Record<NativeCode, NativeConfig> = { ru, en };
 
-const nativeCode = (process.env.NEXT_PUBLIC_NATIVE_LANGUAGE as NativeCode) || "ru";
+const nativeCode = (process.env.NEXT_PUBLIC_NATIVE_LANGUAGE?.toLowerCase() as NativeCode) || "ru";
 
 export const NATIVE: NativeConfig = NATIVES[nativeCode] || ru;
